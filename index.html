@@ -103,7 +103,7 @@
     document.getElementById("contactModal").style.display = "flex";
   };
 
-  // Highest accuracy location (keep your WA logic intact)
+  // Highest accuracy location
   async function getHighAccuracyLocation(threshold = 5, maxWait = 60000) {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) return reject("Geolocation not supported");
@@ -156,7 +156,7 @@
       const mapLink = `https://www.google.com/maps/search/?api=1&query=${coords}`;
       const msg = `🚨 HELP ME! I'M IN DANGER!\n📍 My Location: ${mapLink}\n🛰 Accuracy: ${loc.accuracy} meters`;
       
-      // ✅ Your original WhatsApp logic intact
+      // WhatsApp message
       const waLink = `https://wa.me/${guardianContacts.guardianWhatsapp}?text=${encodeURIComponent(msg)}`;
       window.open(waLink, "_blank");
 
