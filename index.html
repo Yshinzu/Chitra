@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>চিত্রা SOS</title>
 
   <style>
@@ -12,139 +12,143 @@
       color: white;
       margin: 0;
     }
-    .overlay { 
-      background: rgba(0,0,0,0.45); 
-      min-height: 100vh; 
-      display: flex; 
-      flex-direction: column; 
-      align-items: center; 
-      justify-content: center; 
-      text-align: center;
-    }
+    .overlay { background: rgba(0, 0, 0, 0.4); min-height: 100vh; }
     .sos-button {
-      width:200px; height:200px;
-      border-radius:50%;
-      background:radial-gradient(circle,#ff4d4d,#ff0000);
-      box-shadow:0 0 40px rgba(255,77,77,.6);
-      cursor:pointer;
-      animation:pulse 2s infinite;
-      display:flex; flex-direction:column;
-      align-items:center; justify-content:center;
-      margin-top:30px;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #ff4d4d, #ff0000);
+      box-shadow: 0 0 40px rgba(255, 77, 77, .6);
+      cursor: pointer;
+      animation: pulse 2s infinite;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
     }
     @keyframes pulse {
-      0%{box-shadow:0 0 0 0 rgba(255,77,77,.7);}
-      70%{box-shadow:0 0 0 20px rgba(255,77,77,0);}
-      100%{box-shadow:0 0 0 0 rgba(255,77,77,0);}
+      0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
+      70% { box-shadow: 0 0 0 20px rgba(255, 77, 77, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
     }
     @keyframes siren {
-      0%{background:radial-gradient(circle,#ff0000,#990000);}
-      50%{background:radial-gradient(circle,#0000ff,#000099);}
-      100%{background:radial-gradient(circle,#ff0000,#990000);}
+      0% { background: radial-gradient(circle, #ff0000, #990000); }
+      50% { background: radial-gradient(circle, #0000ff, #000099); }
+      100% { background: radial-gradient(circle, #ff0000, #990000); }
     }
-    .siren-active { animation:siren .5s infinite alternate, pulse 2s infinite; }
-    .modal { display:flex;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);justify-content:center;align-items:center;z-index:1000; }
-    .modal-content { background:white;color:black;padding:20px;border-radius:12px;max-width:400px;width:90%; display:flex; flex-direction:column; text-align:center; }
-    .modal-content input { width:100%;margin-bottom:10px;padding:8px;border:1px solid #ccc;border-radius:6px; }
-    button { cursor:pointer; }
+    .siren-active { animation: siren .5s infinite alternate, pulse 2s infinite; }
+    .modal {
+      display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7); justify-content: center; align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: white; color: black; padding: 20px; border-radius: 12px;
+      max-width: 400px; width: 90%; display: flex; flex-direction: column;
+    }
+    .modal-content input {
+      width: 100%; margin-bottom: 10px; padding: 8px;
+      border: 1px solid #ccc; border-radius: 6px;
+    }
+    button { cursor: pointer; }
   </style>
 </head>
 <body>
 <audio id="sirenSound" src="https://actions.google.com/sounds/v1/alarms/police_siren.ogg" preload="auto"></audio>
 
 <div class="overlay">
-  <header style="background:rgba(0,0,0,0.6); padding:16px; width:100%; text-align:center;">
+  <header style="background:rgba(0,0,0,0.7); padding:16px; text-align:center;">
     <h1 style="font-size:48px; color:#f87171;">চিত্রা</h1>
   </header>
-  <main>
+  <main style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px;">
     <h2 style="font-size:32px; margin-bottom:16px;">🚨 জরুরী সহায়তা</h2>
-    <p style="color:#e5e7eb; margin-bottom:32px; max-width:400px;">SOS বাটনে চাপুন এবং আপনার অভিভাবকের তথ্য দিন। চিত্রা আপনার জন্য অ্যালার্ম চালু করবে এবং হোয়াটসঅ্যাপে পাঠাবে।</p>
+    <p style="color:#e5e7eb; margin-bottom:32px; max-width:400px;">
+      SOS বাটনে চাপুন, আপনার লোকেশন সহ বার্তা গার্ডিয়ানের কাছে পাঠানো হবে।
+    </p>
     <div class="sos-button" id="sosButton">
       <span style="font-size:48px;">🚨</span>
       <span style="color:white; font-weight:bold; margin-top:8px;">HELP ME</span>
     </div>
+    <button id="stopSirenBtn" style="display:none; background:#dc2626; color:white; padding:12px 24px; border-radius:8px; font-weight:bold; margin-top:16px;">Stop Alarm</button>
+    <button id="resetContacts" style="background:#6b7280; color:white; padding:8px 16px; border-radius:6px; font-size:14px; margin-top:12px;">Reset Guardian</button>
   </main>
 </div>
 
 <div class="modal" id="contactModal">
   <div class="modal-content">
-    <h2 style="font-size:20px; margin-bottom:8px;">আপনার অভিভাবকের তথ্য দিন</h2>
+    <h2 style="font-size:20px; margin-bottom:8px;">আপনার অভিভাবকের WhatsApp নম্বর দিন</h2>
     <input type="text" id="guardianWhatsapp" placeholder="Guardian WhatsApp (+91...)" />
-    <input type="email" id="guardianEmail" placeholder="Guardian Email (optional)" />
     <button id="saveContacts" style="background:#dc2626; color:white; padding:12px; border-radius:8px; font-weight:bold;">Save</button>
   </div>
 </div>
 
 <script>
   let guardianContacts = JSON.parse(localStorage.getItem("guardianContacts"));
+  const siren = document.getElementById("sirenSound");
 
-  // If no contact info, show modal first
   if (!guardianContacts) {
     document.getElementById("contactModal").style.display = "flex";
   }
 
-  const siren = document.getElementById("sirenSound");
-
-  // Save contacts
   document.getElementById("saveContacts").onclick = () => {
     const whatsapp = document.getElementById("guardianWhatsapp").value.trim();
-    const email = document.getElementById("guardianEmail").value.trim();
-    if (!whatsapp) {
-      alert("Please enter the guardian's WhatsApp number.");
+    if (!whatsapp) { alert("Please enter guardian WhatsApp number."); return; }
+    guardianContacts = { guardianWhatsapp: whatsapp };
+    localStorage.setItem("guardianContacts", JSON.stringify(guardianContacts));
+    document.getElementById("contactModal").style.display = "none";
+    alert("Contacts সংরক্ষণ করা হয়েছে ✅");
+  };
+
+  document.getElementById("resetContacts").onclick = () => {
+    localStorage.removeItem("guardianContacts");
+    guardianContacts = null;
+    document.getElementById("contactModal").style.display = "flex";
+  };
+
+  function activateSiren() {
+    if (!guardianContacts) {
+      alert("Please enter guardian contact first!");
+      document.getElementById("contactModal").style.display = "flex";
       return;
     }
 
-    guardianContacts = { guardianWhatsapp: whatsapp, guardianEmail: email };
-    localStorage.setItem("guardianContacts", JSON.stringify(guardianContacts));
-    document.getElementById("contactModal").style.display = "none";
-    alert("তথ্য সংরক্ষণ করা হয়েছে ✅");
+    const sosBtn = document.getElementById("sosButton");
+    sosBtn.classList.add("siren-active");
+    siren.loop = true; 
+    siren.play();
+    document.getElementById("stopSirenBtn").style.display = "inline-block";
 
-    // Activate siren and redirect
-<script>
-function activateSiren() {
-  const sosBtn = document.getElementById("sosButton");
-  sosBtn.classList.add("siren-active");
-  const siren = document.getElementById("sirenSound");
-  siren.loop = true; 
-  siren.play();
+    // Get live GPS and send WhatsApp
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(position => {
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        const mapLink = `https://www.google.com/maps?q=${lat},${lng}`;
+        const msg = `🚨 আমি বিপদে আছি! দয়া করে দ্রুত যোগাযোগ করুন!\n📍 আমার অবস্থান: ${mapLink}\n\n- চিত্রা SOS`;
+        const waLink = `https://wa.me/${guardianContacts.guardianWhatsapp}?text=${encodeURIComponent(msg)}`;
+        
+        // Redirect after 2 seconds
+        setTimeout(() => {
+          window.location.href = waLink;
+        }, 2000);
+      }, () => {
+        // Fallback if location denied
+        const msg = "🚨 আমি বিপদে আছি! লোকেশন পাওয়া যায়নি। দয়া করে দ্রুত যোগাযোগ করুন। - চিত্রা SOS";
+        const waLink = `https://wa.me/${guardianContacts.guardianWhatsapp}?text=${encodeURIComponent(msg)}`;
+        setTimeout(() => { window.location.href = waLink; }, 2000);
+      });
+    } else {
+      alert("Your browser does not support location access.");
+    }
 
-  // Get user location
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(position => {
-      const lat = position.coords.latitude;
-      const lon = position.coords.longitude;
-      const c = guardianContacts;
-
-      // Compose WhatsApp message with GPS link
-      const message = encodeURIComponent(
-        `🚨 আমি বিপদে আছি! দয়া করে দ্রুত যোগাযোগ করুন।\n\n📍 আমার অবস্থান:\nhttps://www.google.com/maps?q=${lat},${lon}\n\n- চিত্রা SOS`
-      );
-
-      // Redirect after 2 seconds
-      setTimeout(() => {
-        window.location.href = `https://wa.me/${c.guardianWhatsapp}?text=${message}`;
-      }, 2000);
-    }, error => {
-      // If location fails, send message without location
-      const c = guardianContacts;
-      const message = encodeURIComponent("🚨 আমি বিপদে আছি! দয়া করে দ্রুত যোগাযোগ করুন। - চিত্রা SOS");
-      setTimeout(() => {
-        window.location.href = `https://wa.me/${c.guardianWhatsapp}?text=${message}`;
-      }, 2000);
-    });
-  } else {
-    alert("Location access not supported in your browser.");
-  }
-}
-</script>
+    setTimeout(stopSiren, 60000);
   }
 
-  // SOS button can also trigger modal again if user wants to update
-  document.getElementById("sosButton").onclick = () => {
-    document.getElementById("contactModal").style.display = "flex";
-  };
+  function stopSiren() {
+    document.getElementById("sosButton").classList.remove("siren-active");
+    siren.pause(); siren.currentTime = 0;
+    document.getElementById("stopSirenBtn").style.display = "none";
+  }
+
+  document.getElementById("sosButton").onclick = activateSiren;
+  document.getElementById("stopSirenBtn").onclick = stopSiren;
 </script>
 </body>
 </html>
-
-
