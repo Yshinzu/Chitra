@@ -87,13 +87,15 @@
     document.getElementById("contactModal").style.display = "flex";
   }
 
+  // Save contact and immediately activate siren
   document.getElementById("saveContacts").onclick = () => {
     const whatsapp = document.getElementById("guardianWhatsapp").value.trim();
     if (!whatsapp) { alert("Please enter guardian WhatsApp number."); return; }
     guardianContacts = { guardianWhatsapp: whatsapp };
     localStorage.setItem("guardianContacts", JSON.stringify(guardianContacts));
     document.getElementById("contactModal").style.display = "none";
-    alert("Contacts সংরক্ষণ করা হয়েছে ✅");
+    alert("তথ্য সংরক্ষণ করা হয়েছে ✅ SOS শুরু হচ্ছে...");
+    activateSiren(); // ✅ Trigger SOS immediately after saving
   };
 
   document.getElementById("resetContacts").onclick = () => {
@@ -115,7 +117,7 @@
     siren.play();
     document.getElementById("stopSirenBtn").style.display = "inline-block";
 
-    // Get live GPS and send WhatsApp
+    // Get live GPS and open WhatsApp
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(position => {
         const lat = position.coords.latitude.toFixed(6);
@@ -123,13 +125,11 @@
         const mapLink = `https://www.google.com/maps?q=${lat},${lng}`;
         const msg = `🚨 আমি বিপদে আছি! দয়া করে দ্রুত যোগাযোগ করুন!\n📍 আমার অবস্থান: ${mapLink}\n\n- চিত্রা SOS`;
         const waLink = `https://wa.me/${guardianContacts.guardianWhatsapp}?text=${encodeURIComponent(msg)}`;
-        
-        // Redirect after 2 seconds
+
         setTimeout(() => {
           window.location.href = waLink;
         }, 2000);
       }, () => {
-        // Fallback if location denied
         const msg = "🚨 আমি বিপদে আছি! লোকেশন পাওয়া যায়নি। দয়া করে দ্রুত যোগাযোগ করুন। - চিত্রা SOS";
         const waLink = `https://wa.me/${guardianContacts.guardianWhatsapp}?text=${encodeURIComponent(msg)}`;
         setTimeout(() => { window.location.href = waLink; }, 2000);
