@@ -114,6 +114,7 @@
     const sosBtn = document.getElementById("sosButton");
     sosBtn.classList.add("siren-active");
     siren.loop = true; 
+    siren.volume = 1.0; // 🔊 Max loudness
     siren.play();
     document.getElementById("stopSirenBtn").style.display = "inline-block";
 
@@ -152,3 +153,4 @@
 </script>
 </body>
 </html>
+
