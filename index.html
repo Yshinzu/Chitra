@@ -82,29 +82,38 @@
   let guardianContacts = JSON.parse(localStorage.getItem("guardianContacts"));
   const siren = document.getElementById("sirenSound");
 
+  // Show contact form if none saved
   if (!guardianContacts) {
     document.getElementById("contactModal").style.display = "flex";
   }
 
+  // Save guardian number with +91 auto-prefix
   document.getElementById("saveContacts").onclick = () => {
-    const whatsapp = document.getElementById("guardianWhatsapp").value.trim();
+    let whatsapp = document.getElementById("guardianWhatsapp").value.trim();
+
     if (!whatsapp) {
       alert("Please enter guardian WhatsApp number.");
       return;
     }
+
+    // Remove any existing +91 or spaces, then add +91
+    whatsapp = whatsapp.replace(/^(\+91|91)?0?/, ""); // remove +91, 91, or leading 0
+    whatsapp = "+91" + whatsapp;
+
     guardianContacts = { guardianWhatsapp: whatsapp };
     localStorage.setItem("guardianContacts", JSON.stringify(guardianContacts));
     document.getElementById("contactModal").style.display = "none";
     alert("তথ্য সংরক্ষণ করা হয়েছে ✅ এখন HELP ME বাটনে চাপুন SOS পাঠাতে।");
   };
 
+  // Reset saved contact
   document.getElementById("resetContacts").onclick = () => {
     localStorage.removeItem("guardianContacts");
     guardianContacts = null;
     document.getElementById("contactModal").style.display = "flex";
   };
 
-  // Fetch accurate location with retry + fallback
+  // Enhanced accurate location getter with retry + fallback
   async function getAccurateLocation() {
     return new Promise((resolve) => {
       const attempt = (retry = false) => {
@@ -119,11 +128,9 @@
           },
           async () => {
             if (!retry) {
-              // Retry once with longer timeout
               attempt(true);
             } else {
               try {
-                // IP-based fallback
                 const res = await fetch("https://ipapi.co/json/");
                 const data = await res.json();
                 resolve({
@@ -153,12 +160,12 @@
 
     const sosBtn = document.getElementById("sosButton");
     sosBtn.classList.add("siren-active");
+
     siren.loop = true;
     siren.volume = 1.0;
     siren.play();
     document.getElementById("stopSirenBtn").style.display = "inline-block";
 
-    // Notify locating process
     alert("📡 Locating your current position... please wait.");
 
     const loc = await getAccurateLocation();
@@ -176,7 +183,8 @@
   }
 
   function sendMessage(message) {
-    const waLink = `https://wa.me/${guardianContacts.guardianWhatsapp}?text=${encodeURIComponent(message)}`;
+    const waNumber = guardianContacts.guardianWhatsapp.replace("+", ""); // wa.me needs digits only
+    const waLink = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
     setTimeout(() => {
       window.location.href = waLink;
     }, 2000);
@@ -194,6 +202,7 @@
 </script>
 </body>
 </html>
+
 
 
 
