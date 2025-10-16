@@ -78,17 +78,14 @@
     <button id="saveContacts" style="background:#dc2626; color:white; padding:12px; border-radius:8px; font-weight:bold;">Save</button>
   </div>
 </div>
-
 <script>
   let guardianContacts = JSON.parse(localStorage.getItem("guardianContacts"));
   const siren = document.getElementById("sirenSound");
 
-  // Show contact modal if none saved
   if (!guardianContacts) {
     document.getElementById("contactModal").style.display = "flex";
   }
 
-  // Save contact only
   document.getElementById("saveContacts").onclick = () => {
     const whatsapp = document.getElementById("guardianWhatsapp").value.trim();
     if (!whatsapp) {
@@ -101,15 +98,53 @@
     alert("তথ্য সংরক্ষণ করা হয়েছে ✅ এখন HELP ME বাটনে চাপুন SOS পাঠাতে।");
   };
 
-  // Reset saved contact
   document.getElementById("resetContacts").onclick = () => {
     localStorage.removeItem("guardianContacts");
     guardianContacts = null;
     document.getElementById("contactModal").style.display = "flex";
   };
 
-  // Main SOS activation
-  function activateSiren() {
+  // Fetch accurate location with retry + fallback
+  async function getAccurateLocation() {
+    return new Promise((resolve) => {
+      const attempt = (retry = false) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            resolve({
+              lat: pos.coords.latitude.toFixed(6),
+              lng: pos.coords.longitude.toFixed(6),
+              accuracy: pos.coords.accuracy,
+              source: "gps",
+            });
+          },
+          async () => {
+            if (!retry) {
+              // Retry once with longer timeout
+              attempt(true);
+            } else {
+              try {
+                // IP-based fallback
+                const res = await fetch("https://ipapi.co/json/");
+                const data = await res.json();
+                resolve({
+                  lat: data.latitude.toFixed(6),
+                  lng: data.longitude.toFixed(6),
+                  accuracy: 5000,
+                  source: "ip",
+                });
+              } catch {
+                resolve(null);
+              }
+            }
+          },
+          { enableHighAccuracy: true, timeout: retry ? 15000 : 8000, maximumAge: 0 }
+        );
+      };
+      attempt();
+    });
+  }
+
+  async function activateSiren() {
     if (!guardianContacts) {
       alert("Please enter guardian contact first!");
       document.getElementById("contactModal").style.display = "flex";
@@ -118,45 +153,35 @@
 
     const sosBtn = document.getElementById("sosButton");
     sosBtn.classList.add("siren-active");
-
     siren.loop = true;
-    siren.volume = 1.0; // loudest
+    siren.volume = 1.0;
     siren.play();
     document.getElementById("stopSirenBtn").style.display = "inline-block";
 
-    // Get current live location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude.toFixed(6);
-          const lng = position.coords.longitude.toFixed(6);
-          const mapLink = `https://www.google.com/maps?q=${lat},${lng}`;
-          const msg = `🚨 আমি বিপদে আছি! দয়া করে দ্রুত যোগাযোগ করুন!\n📍 বর্তমান অবস্থান: ${mapLink}\n\n- চিত্রা SOS`;
-          const waLink = `https://wa.me/${guardianContacts.guardianWhatsapp}?text=${encodeURIComponent(msg)}`;
+    // Notify locating process
+    alert("📡 Locating your current position... please wait.");
 
-          // Redirect to WhatsApp
-          setTimeout(() => {
-            window.location.href = waLink;
-          }, 2000);
-        },
-        (error) => {
-          const msg = "🚨 আমি বিপদে আছি! লোকেশন পাওয়া যায়নি। দয়া করে দ্রুত যোগাযোগ করুন। - চিত্রা SOS";
-          const waLink = `https://wa.me/${guardianContacts.guardianWhatsapp}?text=${encodeURIComponent(msg)}`;
-          setTimeout(() => {
-            window.location.href = waLink;
-          }, 2000);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
-      alert("Your browser does not support location access.");
+    const loc = await getAccurateLocation();
+    if (!loc) {
+      alert("❌ Location unavailable. Sending SOS without coordinates.");
+      sendMessage("🚨 আমি বিপদে আছি! লোকেশন পাওয়া যায়নি। দয়া করে দ্রুত যোগাযোগ করুন।");
+      stopSiren();
+      return;
     }
 
-    // Auto-stop siren after 60 s
+    const mapLink = `https://www.google.com/maps?q=${loc.lat},${loc.lng}`;
+    const msg = `🚨 আমি বিপদে আছি! দয়া করে দ্রুত যোগাযোগ করুন!\n📍 বর্তমান অবস্থান: ${mapLink}\n🎯 উৎস: ${loc.source.toUpperCase()} (±${loc.accuracy}m)\n\n- চিত্রা SOS`;
+    sendMessage(msg);
     setTimeout(stopSiren, 60000);
   }
 
-  // Stop siren manually
+  function sendMessage(message) {
+    const waLink = `https://wa.me/${guardianContacts.guardianWhatsapp}?text=${encodeURIComponent(message)}`;
+    setTimeout(() => {
+      window.location.href = waLink;
+    }, 2000);
+  }
+
   function stopSiren() {
     document.getElementById("sosButton").classList.remove("siren-active");
     siren.pause();
@@ -164,12 +189,12 @@
     document.getElementById("stopSirenBtn").style.display = "none";
   }
 
-  // Button bindings
   document.getElementById("sosButton").onclick = activateSiren;
   document.getElementById("stopSirenBtn").onclick = stopSiren;
 </script>
 </body>
 </html>
+
 
 
 
