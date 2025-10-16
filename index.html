@@ -100,21 +100,44 @@
     alert("তথ্য সংরক্ষণ করা হয়েছে ✅");
 
     // Activate siren and redirect
-    activateSiren();
-  };
+   <script>
+function activateSiren() {
+  const sosBtn = document.getElementById("sosButton");
+  sosBtn.classList.add("siren-active");
+  const siren = document.getElementById("sirenSound");
+  siren.loop = true; 
+  siren.play();
 
-  function activateSiren() {
-    const sosBtn = document.getElementById("sosButton");
-    sosBtn.classList.add("siren-active");
-    siren.loop = true; 
-    siren.play();
+  // Get user location
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(position => {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      const c = guardianContacts;
 
-    // Redirect to WhatsApp after 2 seconds
-    setTimeout(() => {
+      // Compose WhatsApp message with GPS link
+      const message = encodeURIComponent(
+        `🚨 আমি বিপদে আছি! দয়া করে দ্রুত যোগাযোগ করুন।\n\n📍 আমার অবস্থান:\nhttps://www.google.com/maps?q=${lat},${lon}\n\n- চিত্রা SOS`
+      );
+
+      // Redirect after 2 seconds
+      setTimeout(() => {
+        window.location.href = `https://wa.me/${c.guardianWhatsapp}?text=${message}`;
+      }, 2000);
+    }, error => {
+      // If location fails, send message without location
       const c = guardianContacts;
       const message = encodeURIComponent("🚨 আমি বিপদে আছি! দয়া করে দ্রুত যোগাযোগ করুন। - চিত্রা SOS");
-      window.location.href = `https://wa.me/${c.guardianWhatsapp}?text=${message}`;
-    }, 2000);
+      setTimeout(() => {
+        window.location.href = `https://wa.me/${c.guardianWhatsapp}?text=${message}`;
+      }, 2000);
+    });
+  } else {
+    alert("Location access not supported in your browser.");
+  }
+}
+</script>
+
   }
 
   // SOS button can also trigger modal again if user wants to update
@@ -124,3 +147,4 @@
 </script>
 </body>
 </html>
+
