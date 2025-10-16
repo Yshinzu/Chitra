@@ -126,8 +126,8 @@ document.getElementById("resetContacts").onclick = () => {
   document.getElementById("contactModal").style.display = "flex";
 };
 
-// Primary: get best GPS fix by sampling multiple readings
-function getBestGpsFix(timeoutMs = MAX_WAIT_MS, desiredAccuracy = DESIRED_ACCURACY_M) {
+// Strict GPS-only live location
+async function getLiveGpsLocation(timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
       resolve(null);
@@ -135,52 +135,47 @@ function getBestGpsFix(timeoutMs = MAX_WAIT_MS, desiredAccuracy = DESIRED_ACCURA
     }
 
     let best = null;
-    let watchId = null;
     const start = Date.now();
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const age = Date.now() - pos.timestamp;
+        // Ignore cached or stale readings (>5s old)
+        if (age > 5000) return;
 
-    function finishAndCleanup(result) {
-      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-      resolve(result);
-    }
-
-    // Success callback collects readings and chooses the best
-    function onSuccess(pos) {
-      const reading = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-        timestamp: pos.timestamp,
-      };
-
-      // Keep the best (smallest accuracy)
-      if (!best || reading.accuracy < best.accuracy) best = reading;
-
-      // If it's already good enough, finish early
-      if (reading.accuracy <= desiredAccuracy) {
-        finishAndCleanup({
-          lat: reading.lat.toFixed(6),
-          lng: reading.lng.toFixed(6),
-          accuracy: Math.round(reading.accuracy),
-          source: "gps",
-        });
-      } else {
-        // If we've already waited long enough, finish with best
-        if (Date.now() - start >= timeoutMs) {
-          if (best) {
-            finishAndCleanup({
-              lat: best.lat.toFixed(6),
-              lng: best.lng.toFixed(6),
-              accuracy: Math.round(best.accuracy),
-              source: "gps",
-            });
-          } else {
-            finishAndCleanup(null);
-          }
+        const acc = pos.coords.accuracy;
+        if (!best || acc < best.accuracy) {
+          best = {
+            lat: pos.coords.latitude.toFixed(6),
+            lng: pos.coords.longitude.toFixed(6),
+            accuracy: acc,
+            source: "gps",
+          };
         }
-        // else keep watching until timeout or desiredAccuracy reached
-      }
-    }
 
+        // Accept early if accuracy ≤ 30 m
+        if (acc <= 30 || Date.now() - start > timeoutMs) {
+          navigator.geolocation.clearWatch(watchId);
+          resolve(best);
+        }
+      },
+      (err) => {
+        navigator.geolocation.clearWatch(watchId);
+        resolve(null);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: timeoutMs,
+      }
+    );
+
+    // Failsafe timeout
+    setTimeout(() => {
+      navigator.geolocation.clearWatch(watchId);
+      resolve(best);
+    }, timeoutMs + 2000);
+  });
+}
     function onError(err) {
       // If permission denied or other fatal error, stop and return null
       // If PERMISSION_DENIED, no point retrying
@@ -342,6 +337,7 @@ document.getElementById("stopSirenBtn").onclick = stopSiren;
 </script>
 </body>
 </html>
+
 
 
 
