@@ -88,14 +88,13 @@
   }
 
   // Save contact and immediately activate siren
-  document.getElementById("saveContacts").onclick = () => {
-    const whatsapp = document.getElementById("guardianWhatsapp").value.trim();
-    if (!whatsapp) { alert("Please enter guardian WhatsApp number."); return; }
-    guardianContacts = { guardianWhatsapp: whatsapp };
-    localStorage.setItem("guardianContacts", JSON.stringify(guardianContacts));
-    document.getElementById("contactModal").style.display = "none";
-    alert("তথ্য সংরক্ষণ করা হয়েছে ✅ SOS শুরু হচ্ছে...");
-    activateSiren(); // ✅ Trigger SOS immediately after saving
+ document.getElementById("saveContacts").onclick = () => {
+  const whatsapp = document.getElementById("guardianWhatsapp").value.trim();
+  if (!whatsapp) { alert("Please enter guardian WhatsApp number."); return; }
+  guardianContacts = { guardianWhatsapp: whatsapp };
+  localStorage.setItem("guardianContacts", JSON.stringify(guardianContacts));
+  document.getElementById("contactModal").style.display = "none";
+  alert("তথ্য সংরক্ষণ করা হয়েছে ✅ এখন HELP ME বাটনে চাপুন SOS পাঠাতে।");
   };
 
   document.getElementById("resetContacts").onclick = () => {
@@ -153,4 +152,5 @@
 </script>
 </body>
 </html>
+
 
