@@ -79,6 +79,17 @@
   </div>
 </div>
 <script>
+/*
+  Improved location logic:
+  - Uses watchPosition to collect multiple samples
+  - Chooses the sample with the smallest accuracy value
+  - Waits up to MAX_WAIT_MS for a good reading (DESIRED_ACCURACY_M)
+  - Falls back to IP-based lookup only if no GPS readings come in
+  - Auto-adds +91 prefix when saving guardian number
+*/
+
+const MAX_WAIT_MS = 12000;           // how long to wait for good GPS fixes
+const DESIRED_ACCURACY_M = 50;       // target accuracy (meters) to accept early
 let guardianContacts = JSON.parse(localStorage.getItem("guardianContacts"));
 const siren = document.getElementById("sirenSound");
 
@@ -86,44 +97,37 @@ if (!guardianContacts) {
   document.getElementById("contactModal").style.display = "flex";
 }
 
-// ✅ Save guardian number (auto +91) and show toast
+// Save guardian number (auto +91)
 document.getElementById("saveContacts").onclick = () => {
   let whatsapp = document.getElementById("guardianWhatsapp").value.trim();
   if (!whatsapp) {
     alert("Please enter guardian WhatsApp number.");
     return;
   }
-
-  whatsapp = whatsapp.replace(/\D/g, ""); // remove non-digits
+  // Clean number and ensure +91 prefix
+  whatsapp = whatsapp.replace(/\D/g, ""); // remove non-digit chars
   if (whatsapp.length === 10) whatsapp = "+91" + whatsapp;
-  else if (whatsapp.startsWith("91") && whatsapp.length === 12) whatsapp = "+" + whatsapp;
-  else if (!whatsapp.startsWith("+91")) whatsapp = "+91" + whatsapp;
+  else if (whatsapp.length === 12 && whatsapp.startsWith("91")) whatsapp = "+" + whatsapp;
+  else if (whatsapp.startsWith("+91") && whatsapp.length === 13) { /* ok */ }
+  else {
+    // If it's some other length, still prefix +91 but warn
+    whatsapp = "+91" + whatsapp;
+  }
 
   guardianContacts = { guardianWhatsapp: whatsapp };
   localStorage.setItem("guardianContacts", JSON.stringify(guardianContacts));
   document.getElementById("contactModal").style.display = "none";
-
-  // ✅ Toast confirmation (no freeze, no alert)
-  const toast = document.createElement("div");
-  toast.textContent = "✅ অভিভাবকের তথ্য সংরক্ষিত হয়েছে\nএখন HELP ME চাপুন SOS পাঠাতে";
-  toast.style.cssText = `
-    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
-    background:rgba(0,0,0,0.8);color:white;padding:12px 18px;
-    border-radius:10px;font-size:15px;z-index:3000;
-    text-align:center;white-space:pre-line;`;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
+  alert("তথ্য সংরক্ষণ করা হয়েছে ✅ এখন HELP ME বাটনে চাপুন SOS পাঠাতে।");
 };
 
-// ✅ Reset saved contact
 document.getElementById("resetContacts").onclick = () => {
   localStorage.removeItem("guardianContacts");
   guardianContacts = null;
   document.getElementById("contactModal").style.display = "flex";
 };
 
-// ✅ Strict GPS-only live location
-async function getLiveGpsLocation(timeoutMs = 15000) {
+// Primary: get best GPS fix by sampling multiple readings
+function getBestGpsFix(timeoutMs = MAX_WAIT_MS, desiredAccuracy = DESIRED_ACCURACY_M) {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
       resolve(null);
@@ -131,42 +135,90 @@ async function getLiveGpsLocation(timeoutMs = 15000) {
     }
 
     let best = null;
+    let watchId = null;
     const start = Date.now();
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const age = Date.now() - pos.timestamp;
-        if (age > 5000) return; // ignore stale data
 
-        const acc = pos.coords.accuracy;
-        if (!best || acc < best.accuracy) {
-          best = {
-            lat: pos.coords.latitude.toFixed(6),
-            lng: pos.coords.longitude.toFixed(6),
-            accuracy: acc,
+    function finishAndCleanup(result) {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      resolve(result);
+    }
+
+    // Success callback collects readings and chooses the best
+    function onSuccess(pos) {
+      const reading = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        timestamp: pos.timestamp,
+      };
+
+      // Keep the best (smallest accuracy)
+      if (!best || reading.accuracy < best.accuracy) best = reading;
+
+      // If it's already good enough, finish early
+      if (reading.accuracy <= desiredAccuracy) {
+        finishAndCleanup({
+          lat: reading.lat.toFixed(6),
+          lng: reading.lng.toFixed(6),
+          accuracy: Math.round(reading.accuracy),
+          source: "gps",
+        });
+      } else {
+        // If we've already waited long enough, finish with best
+        if (Date.now() - start >= timeoutMs) {
+          if (best) {
+            finishAndCleanup({
+              lat: best.lat.toFixed(6),
+              lng: best.lng.toFixed(6),
+              accuracy: Math.round(best.accuracy),
+              source: "gps",
+            });
+          } else {
+            finishAndCleanup(null);
+          }
+        }
+        // else keep watching until timeout or desiredAccuracy reached
+      }
+    }
+
+    function onError(err) {
+      // If permission denied or other fatal error, stop and return null
+      // If PERMISSION_DENIED, no point retrying
+      if (err && err.code === 1) { // PERMISSION_DENIED
+        finishAndCleanup(null);
+        return;
+      }
+      // Otherwise, wait until timeout; gps may still recover; do nothing here
+    }
+
+    // Start watching position with high accuracy and small frequency
+    try {
+      watchId = navigator.geolocation.watchPosition(onSuccess, onError, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: timeoutMs
+      });
+
+      // Safety timeout in case watchPosition doesn't call back quickly
+      setTimeout(() => {
+        if (best) {
+          finishAndCleanup({
+            lat: best.lat.toFixed(6),
+            lng: best.lng.toFixed(6),
+            accuracy: Math.round(best.accuracy),
             source: "gps",
-          };
+          });
+        } else {
+          finishAndCleanup(null);
         }
-
-        if (acc <= 30 || Date.now() - start > timeoutMs) {
-          navigator.geolocation.clearWatch(watchId);
-          resolve(best);
-        }
-      },
-      (err) => {
-        navigator.geolocation.clearWatch(watchId);
-        resolve(null);
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: timeoutMs }
-    );
-
-    setTimeout(() => {
-      navigator.geolocation.clearWatch(watchId);
-      resolve(best);
-    }, timeoutMs + 2000);
+      }, timeoutMs + 500); // small buffer
+    } catch (e) {
+      finishAndCleanup(null);
+    }
   });
 }
 
-// ✅ IP fallback if GPS fails
+// IP fallback if GPS fails
 async function ipFallback() {
   try {
     const res = await fetch("https://ipapi.co/json/");
@@ -179,75 +231,117 @@ async function ipFallback() {
         source: "ip",
       };
     }
-  } catch (e) {}
+  } catch (e) {
+    // ignore
+  }
   return null;
 }
 
-// ✅ WhatsApp message sender
+// Compose and send WhatsApp message (opens wa.me)
 function sendWhatsAppMessage(message) {
   const waNumber = guardianContacts.guardianWhatsapp.replace(/\D/g, "");
   const waLink = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
-  setTimeout(() => {
-    window.location.href = waLink;
-  }, 1200);
+  // Delay a beat to let UI update / siren start
+  setTimeout(() => { window.location.href = waLink; }, 1200);
 }
 
-// ✅ Activate SOS (HELP ME button)
+// Main SOS flow triggered by HELP ME button
 async function activateSiren() {
   if (!guardianContacts) {
+    alert("Please enter guardian contact first!");
     document.getElementById("contactModal").style.display = "flex";
     return;
   }
 
   const sosBtn = document.getElementById("sosButton");
   sosBtn.classList.add("siren-active");
-
   try {
     siren.loop = true;
     siren.volume = 1.0;
+    // Web Audio boost attempt (graceful fallback)
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const track = audioContext.createMediaElementSource(siren);
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 1.6; // moderate boost; increase carefully if desired
+      track.connect(gainNode).connect(audioContext.destination);
+      audioContext.resume();
+    } catch (e) {
+      // not supported — continue with element volume
+    }
     await siren.play();
-  } catch (e) {}
-
+  } catch (e) {
+    // autoplay or play() rejection — user gesture (we have one), ignore
+  }
   document.getElementById("stopSirenBtn").style.display = "inline-block";
 
-  // Toast: locating...
-  const toast = document.createElement("div");
-  toast.textContent = "📡 Locating your live position...";
-  toast.style.cssText = `
-    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
-    background:rgba(0,0,0,0.7);color:white;padding:10px 16px;
-    border-radius:8px;font-size:14px;z-index:2000;`;
-  document.body.appendChild(toast);
+  // Inform user
+  // Prefer a gentle non-blocking overlay; fallback to alert if overlay not present
+  try {
+    // Create a small temporary toast/overlay element
+    let toast = document.createElement("div");
+    toast.id = "chitra-loc-toast";
+    toast.style.position = "fixed";
+    toast.style.bottom = "18px";
+    toast.style.left = "50%";
+    toast.style.transform = "translateX(-50%)";
+    toast.style.background = "rgba(0,0,0,0.7)";
+    toast.style.color = "white";
+    toast.style.padding = "10px 14px";
+    toast.style.borderRadius = "8px";
+    toast.style.zIndex = 2000;
+    toast.style.fontSize = "14px";
+    toast.textContent = "📡 Locating (will use best GPS fix available)...";
+    document.body.appendChild(toast);
+  } catch (e) {
+    alert("📡 Locating your current position... please wait.");
+  }
 
-  const loc = await getLiveGpsLocation();
-  toast.remove();
+  // Try to get best GPS fix
+  const loc = await getBestGpsFix(MAX_WAIT_MS, DESIRED_ACCURACY_M);
 
-  let finalLoc = loc || (await ipFallback());
+  // remove toast if present
+  const t = document.getElementById("chitra-loc-toast");
+  if (t) t.remove();
+
+  let finalLoc = loc;
   if (!finalLoc) {
+    // attempt IP fallback
+    finalLoc = await ipFallback();
+  }
+
+  if (!finalLoc) {
+    // No location at all
     sendWhatsAppMessage("🚨 আমি বিপদে আছি! লোকেশন পাওয়া যায়নি। দয়া করে দ্রুত যোগাযোগ করুন। - চিত্রা SOS");
+    // auto stop later
     setTimeout(stopSiren, 60000);
     return;
   }
 
+  // Compose message including accuracy and source to help responders
   const mapLink = `https://www.google.com/maps?q=${finalLoc.lat},${finalLoc.lng}`;
-  const msg = `🚨 আমি বিপদে আছি! দয়া করে দ্রুত যোগাযোগ করুন!\n📍 বর্তমান অবস্থান: ${mapLink}\n🎯 উৎস: ${finalLoc.source.toUpperCase()} (±${Math.round(finalLoc.accuracy)}m)\n\n- চিত্রা SOS`;
+  const accuracyText = finalLoc.accuracy ? ` (±${finalLoc.accuracy}m)` : "";
+  const msg = `🚨 আমি বিপদে আছি! দয়া করে দ্রুত যোগাযোগ করুন!\n📍 বর্তমান অবস্থান: ${mapLink}${accuracyText}\n🎯 উৎস: ${finalLoc.source.toUpperCase()}\n\n- চিত্রা SOS`;
 
   sendWhatsAppMessage(msg);
+
+  // stop siren after reasonable time (clean up)
   setTimeout(stopSiren, 60000);
 }
 
-// ✅ Stop siren
 function stopSiren() {
-  document.getElementById("sosButton").classList.remove("siren-active");
-  siren.pause();
-  siren.currentTime = 0;
+  const sosBtn = document.getElementById("sosButton");
+  sosBtn.classList.remove("siren-active");
+  try { siren.pause(); siren.currentTime = 0; } catch (e) {}
   document.getElementById("stopSirenBtn").style.display = "none";
 }
 
+// Bindings
 document.getElementById("sosButton").onclick = activateSiren;
 document.getElementById("stopSirenBtn").onclick = stopSiren;
 </script>
 </body>
 </html>
+
 
 
